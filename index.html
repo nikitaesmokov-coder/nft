@@ -73,7 +73,10 @@
     <input type="text" id="search" class="search-input" placeholder="Поиск по @username или названию подарка...">
     <div id="feed"><div class="empty">Ожидаем новые улучшения в реальном времени...</div></div>
 
-    <script>
+        <script>
+        const JSONBIN_ID = "6afecbf7ac6210605a94776a";
+        const JSONBIN_ACCESS_KEY = "$2a$10$lII0m/CAv5qr3.FeB/NMXeB4rd2OQ3dZyCSucagLIkPv9LtwjGKk2";
+
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
@@ -120,11 +123,16 @@
 
         async function fetchUpdates() {
             try {
-                const res = await fetch("/api/upgrades");
-                const data = await res.json();
-                allItems = data.upgrades;
-                document.getElementById("total-found").innerText = data.upgrades.length;
-                document.getElementById("tracked-count").innerText = data.collections_count;
+                const res = await fetch(`https://jsonbin.io{JSONBIN_ID}/latest`, {
+                    headers: {
+                        "X-Access-Key": JSONBIN_ACCESS_KEY
+                    }
+                });
+                const json = await res.json();
+                const data = json.record || { upgrades: [], collections_count: 0 };
+                allItems = data.upgrades || [];
+                document.getElementById("total-found").innerText = allItems.length;
+                document.getElementById("tracked-count").innerText = data.collections_count || 0;
                 document.getElementById("status").innerText = "Онлайн";
                 renderFeed();
             } catch (e) {
@@ -134,7 +142,10 @@
 
         document.getElementById("search").addEventListener("input", renderFeed);
         fetchUpdates();
-        setInterval(fetchUpdates, 4000);
+        setInterval(fetchUpdates, 5000);
     </script>
 </body>
 </html>
+
+        const JSONBIN_ID = "6afecbf7ac6210605a94776a";
+        const JSONBIN_ACCESS_KEY = "$2a$10$lII0m/CAv5qr3.FeB/NMXeB4rd2OQ3dZyCSucagLIkPv9LtwjGKk2";
