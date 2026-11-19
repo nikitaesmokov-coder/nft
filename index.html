@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NFT Gifts Live Radar</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        :root {
+            --bg: var(--tg-theme-bg-color, #0f1117);
+            --card-bg: var(--tg-theme-secondary-bg-color, #1a1d27);
+            --text: var(--tg-theme-text-color, #ffffff);
+            --hint: var(--tg-theme-hint-color, #8e95a5);
+            --btn: var(--tg-theme-button-color, #2ea6ff);
+            --btn-text: var(--tg-theme-button-text-color, #ffffff);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 14px; padding-bottom: 40px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .header h1 { font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .live-dot { width: 9px; height: 9px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .stat-box { background: var(--card-bg); padding: 12px; border-radius: 12px; }
+        .stat-val { font-size: 20px; font-weight: 700; color: var(--btn); }
+        .stat-lbl { font-size: 12px; color: var(--hint); margin-top: 2px; }
+
+        .search-input {
+            width: 100%; padding: 11px 14px; border-radius: 12px; border: none;
+            background: var(--card-bg); color: var(--text); font-size: 14px; margin-bottom: 14px; outline: none;
+        }
+        .search-input::placeholder { color: var(--hint); }
+
+        .card {
+            background: var(--card-bg); border-radius: 14px; padding: 14px; margin-bottom: 10px;
+            display: flex; flex-direction: column; gap: 8px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .card-top { display: flex; justify-content: space-between; align-items: center; }
+        .gift-title { font-weight: 700; font-size: 15px; }
+        .time { font-size: 12px; color: var(--hint); }
+        .owner { font-size: 14px; color: var(--btn); font-weight: 600; }
+        .attrs { font-size: 12px; color: var(--hint); line-height: 1.4; }
+        
+        .actions { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 4px; }
+        .btn {
+            text-align: center; padding: 9px 10px; border-radius: 10px; font-size: 13px;
+            font-weight: 600; text-decoration: none; cursor: pointer; border: none;
+        }
+        .btn-primary { background: var(--btn); color: var(--btn-text); }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); }
+        .empty { text-align: center; color: var(--hint); margin-top: 40px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span class="live-dot"></span> NFT Upgrades Live</h1>
+        <span style="font-size: 12px; color: var(--hint);" id="status">Обновление...</span>
+    </div>
+
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-val" id="total-found">0</div>
+            <div class="stat-lbl">Найдено владельцев</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-val" id="tracked-count">0</div>
+            <div class="stat-lbl">Коллекций в трекинге</div>
+        </div>
+    </div>
+
+    <input type="text" id="search" class="search-input" placeholder="Поиск по @username или названию подарка...">
+    <div id="feed"><div class="empty">Ожидаем новые улучшения в реальном времени...</div></div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        let allItems = [];
+
+        function openLink(url) {
+            if (url.startsWith("https://t.me")) {
+                tg.openTelegramLink(url);
+            } else {
+                tg.openLink(url);
+            }
+        }
+
+        function renderFeed() {
+            const query = document.getElementById("search").value.toLowerCase();
+            const feed = document.getElementById("feed");
+            const filtered = allItems.filter(item =>
+                item.username.toLowerCase().includes(query) ||
+                item.title.toLowerCase().includes(query) ||
+                item.slug.toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                feed.innerHTML = '<div class="empty">Пока нет записей по вашему фильтру</div>';
+                return;
+            }
+
+            feed.innerHTML = filtered.map(item => `
+                <div class="card">
+                    <div class="card-top">
+                        <span class="gift-title">🎁 ${item.title} #${item.number}</span>
+                        <span class="time">${item.time}</span>
+                    </div>
+                    <div class="owner">👤 @${item.username}</div>
+                    <div class="attrs">✨ ${item.attrs}</div>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="openLink('https://t.me${item.username}')">💬 Написать</button>
+                        <button class="btn btn-secondary" onclick="openLink('https://t.menft/${item.slug}')">🔗 NFT</button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        async function fetchUpdates() {
+            try {
+                const res = await fetch("/api/upgrades");
+                const data = await res.json();
+                allItems = data.upgrades;
+                document.getElementById("total-found").innerText = data.upgrades.length;
+                document.getElementById("tracked-count").innerText = data.collections_count;
+                document.getElementById("status").innerText = "Онлайн";
+                renderFeed();
+            } catch (e) {
+                document.getElementById("status").innerText = "Ошибка сети";
+            }
+        }
+
+        document.getElementById("search").addEventListener("input", renderFeed);
+        fetchUpdates();
+        setInterval(fetchUpdates, 4000);
+    </script>
+</body>
+</html>
